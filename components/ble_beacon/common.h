@@ -26,7 +26,7 @@
 #include "nimble/nimble_port_freertos.h"
 
 /* Defines */
-#define DEVICE_NAME "Volcatec_TempSensor"
+#define DEVICE_NAME "Xiao_TempSensor"
 #define TAG "BLE_Beacon"
 
 /* BLE Appearance Values */
