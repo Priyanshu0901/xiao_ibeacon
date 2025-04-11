@@ -1,0 +1,42 @@
+# Python virtual environment
+test_scripts/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# C/C++ build artifacts
+build/
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.map
+*.hex
+*.lst
+
+# ESP-IDF specific
+sdkconfig
+sdkconfig.old
+dependencies.lock
+.config
+*.old
+compile_commands.json
+
+# IDE specific files
+.vscode/
+.idea/
+.cproject
+.project
+.settings/
+.DS_Store
+
+.devcontainer/
+.cursor/
+sdkconfig.old
+sdkconfig.ci
