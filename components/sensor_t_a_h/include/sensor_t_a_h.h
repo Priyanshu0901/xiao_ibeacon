@@ -3,7 +3,7 @@
  * @brief Temperature, Air pressure, and Humidity sensor interface for ESP32
  *
  * This module provides a thread-safe interface for reading temperature,
- * air pressure, and humidity data from a BME280 sensor with filtering.
+ * air pressure, and humidity data from a BME68X sensor with filtering.
  */
 
 #ifndef SENSOR_T_A_H_H

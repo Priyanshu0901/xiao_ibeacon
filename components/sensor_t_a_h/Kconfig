@@ -1,98 +1,98 @@
-menu "BME280 Configuration"
+menu "BME68X Configuration"
 
-    config BME280_I2C_ADDR
-        hex "BME280 I2C Address"
+    config BME68X_I2C_ADDR
+        hex "BME68X I2C Address"
         default 0x76
         help
-            I2C address of the BME280 sensor. Default is 0x76.
+            I2C address of the BME68X sensor. Default is 0x76.
             Use 0x77 if SDO pin is pulled high.
 
-    choice BME280_INTERFACE
-        prompt "BME280 Interface"
-        default BME280_USE_I2C
+    choice BME68X_INTERFACE
+        prompt "BME68X Interface"
+        default BME68X_USE_I2C
         help
-            Select the interface to use with BME280 sensor.
+            Select the interface to use with BME68X sensor.
 
-        config BME280_USE_I2C
+        config BME68X_USE_I2C
             bool "I2C Interface"
         
-        config BME280_USE_SPI
+        config BME68X_USE_SPI
             bool "SPI Interface"
     endchoice
 
-    if BME280_USE_I2C
-        config BME280_I2C_PORT
+    if BME68X_USE_I2C
+        config BME68X_I2C_PORT
             int "I2C Port Number"
             range 0 1
             default 0
             help
-                I2C port number for BME280.
+                I2C port number for BME68X.
 
-        config BME280_I2C_SDA_PIN
+        config BME68X_I2C_SDA_PIN
             int "I2C SDA GPIO"
             range 0 48
-            default 21
+            default 12
             help
                 GPIO pin for I2C SDA.
 
-        config BME280_I2C_SCL_PIN
+        config BME68X_I2C_SCL_PIN
             int "I2C SCL GPIO"
             range 0 48
-            default 22
+            default 13
             help
                 GPIO pin for I2C SCL.
 
-        config BME280_I2C_CLOCK_SPEED
+        config BME68X_I2C_CLOCK_SPEED
             int "I2C Clock Frequency (Hz)"
             range 100000 400000
             default 100000
             help
-                I2C clock frequency for BME280. Standard mode (100 KHz) or Fast mode (400 KHz).
+                I2C clock frequency for BME68X. Standard mode (100 KHz) or Fast mode (400 KHz).
     endif
 
-    if BME280_USE_SPI
-        config BME280_SPI_HOST
+    if BME68X_USE_SPI
+        config BME68X_SPI_HOST
             int "SPI Host"
             range 0 2
             default 1
             help
-                SPI host to use for BME280. 
+                SPI host to use for BME68X. 
                 HSPI = 1, VSPI = 2
 
-        config BME280_SPI_MOSI_PIN
+        config BME68X_SPI_MOSI_PIN
             int "SPI MOSI GPIO"
             range 0 48
             default 23
             help
                 GPIO pin for SPI MOSI.
 
-        config BME280_SPI_MISO_PIN
+        config BME68X_SPI_MISO_PIN
             int "SPI MISO GPIO"
             range 0 48
             default 19
             help
                 GPIO pin for SPI MISO.
 
-        config BME280_SPI_SCLK_PIN
+        config BME68X_SPI_SCLK_PIN
             int "SPI SCLK GPIO"
             range 0 48
             default 18
             help
                 GPIO pin for SPI SCLK.
 
-        config BME280_SPI_CS_PIN
+        config BME68X_SPI_CS_PIN
             int "SPI CS GPIO"
             range 0 48
             default 5
             help
                 GPIO pin for SPI CS.
 
-        config BME280_SPI_CLOCK_SPEED
+        config BME68X_SPI_CLOCK_SPEED
             int "SPI Clock Frequency (Hz)"
             range 100000 10000000
             default 5000000
             help
-                SPI clock frequency for BME280. Default is 5 MHz.
+                SPI clock frequency for BME68X. Default is 5 MHz.
     endif
 
 endmenu

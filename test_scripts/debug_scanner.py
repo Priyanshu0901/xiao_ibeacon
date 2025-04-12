@@ -3,7 +3,7 @@
 Debug BLE Scanner
 
 This script scans for all BLE advertisements and prints the raw data
-to help diagnose issues with the Volcatec_TempSensor beacon.
+to help diagnose issues with the Xiao_TempSensor beacon.
 """
 
 import asyncio
@@ -40,9 +40,9 @@ async def scan_for_devices():
             else:
                 print(f"  {key}: {value}")
         
-        # Special handling for Volcatec sensor
-        if device.name and "Volcatec" in device.name:
-            print(f"  *** FOUND VOLCATEC DEVICE ***")
+        # Special handling for Xiao sensor
+        if device.name and "Xiao" in device.name:
+            print(f"  *** FOUND Xiao DEVICE ***")
             
             # Check for manufacturer data
             for company_id, data in device.metadata.get("manufacturer_data", {}).items():
