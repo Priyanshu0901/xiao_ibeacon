@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-BLE Beacon Scanner for Volcatec Temperature Sensor
+BLE Beacon Scanner for Xiao Temperature Sensor
 
-This script scans for BLE advertisements from the Volcatec_TempSensor beacon
+This script scans for BLE advertisements from the Xiao_TempSensor beacon
 and decodes the temperature, humidity, and pressure values from the 
 manufacturer-specific data.
 
@@ -35,7 +35,7 @@ init()
 
 # Constants
 ESPRESSIF_COMPANY_ID = 0x02E5
-DEVICE_NAME_FILTER = "Volcatec_TempSensor"
+DEVICE_NAME_FILTER = "Xiao_TempSensor"
 SCAN_DURATION = 5.0  # seconds - shorter time for faster response
 CLEAR_SCREEN_CMD = 'cls' if os.name == 'nt' else 'clear'
 DEBUG_MODE = True  # Set to True to see debug information
@@ -107,7 +107,7 @@ def display_results():
     if not DEBUG_MODE:
         clear_screen()
     print(f"{Fore.CYAN}╔═══════════════════════════════════════════════╗{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}║ {Fore.WHITE}Volcatec Temperature Sensor Beacon Scanner{Fore.CYAN}    ║{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}║ {Fore.WHITE}Xiao Temperature Sensor Beacon Scanner{Fore.CYAN}    ║{Style.RESET_ALL}")
     print(f"{Fore.CYAN}╠═══════════════════════════════════════════════╣{Style.RESET_ALL}")
     
     if latest_update:

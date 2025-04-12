@@ -24,7 +24,7 @@ static TaskHandle_t polling_task_handle = NULL;
 
 /* Context structure */
 typedef struct {
-    struct bme280_dev device; // BME280 device structure
+    struct bme68x_dev device; // BME68X device structure
     sensor_state_t state;     // Current state of the sensor
     bool task_running;        // Flag to control task execution
     uint32_t poll_interval_ms; // Polling interval in milliseconds
@@ -137,7 +137,7 @@ esp_err_t t_a_h_sensor_init(uint32_t poll_interval_ms, uint32_t timeout_ms)
 
     /* Initialize the sensor using the API */
     rslt = sensor_api_init(&sensor_ctx->device);
-    if (rslt != BME280_OK)
+    if (rslt != BME68X_OK)
     {
         ESP_LOGE(TAG, "Failed to initialize sensor");
         vSemaphoreDelete(sensor_ctx->mutex);
@@ -147,11 +147,13 @@ esp_err_t t_a_h_sensor_init(uint32_t poll_interval_ms, uint32_t timeout_ms)
     }
 
     /* Configure sensor settings */
-    struct bme280_settings settings;
-    rslt = sensor_api_get_settings(&sensor_ctx->device, &settings);
-    if (rslt != BME280_OK)
+    struct bme68x_conf conf;
+    struct bme68x_heatr_conf heatr_conf;
+    
+    rslt = bme68x_get_conf(&conf, &sensor_ctx->device);
+    if (rslt != BME68X_OK)
     {
-        ESP_LOGE(TAG, "Failed to get sensor settings");
+        ESP_LOGE(TAG, "Failed to get sensor configuration");
         vSemaphoreDelete(sensor_ctx->mutex);
         free(sensor_ctx);
         sensor_ctx = NULL;
@@ -159,14 +161,14 @@ esp_err_t t_a_h_sensor_init(uint32_t poll_interval_ms, uint32_t timeout_ms)
     }
 
     /* Configure for optimal performance for our use case */
-    settings.filter = BME280_FILTER_COEFF_2;
-    settings.osr_h = BME280_OVERSAMPLING_1X;
-    settings.osr_p = BME280_OVERSAMPLING_1X;
-    settings.osr_t = BME280_OVERSAMPLING_1X;
-    settings.standby_time = BME280_STANDBY_TIME_0_5_MS;
+    conf.filter = BME68X_FILTER_SIZE_3;
+    conf.os_hum = BME68X_OS_1X;
+    conf.os_pres = BME68X_OS_1X;
+    conf.os_temp = BME68X_OS_2X;
+    conf.odr = BME68X_ODR_NONE; // No standby time in forced mode
 
-    rslt = sensor_api_configure(&sensor_ctx->device, &settings);
-    if (rslt != BME280_OK)
+    rslt = bme68x_set_conf(&conf, &sensor_ctx->device);
+    if (rslt != BME68X_OK)
     {
         ESP_LOGE(TAG, "Failed to configure sensor settings");
         vSemaphoreDelete(sensor_ctx->mutex);
@@ -174,10 +176,22 @@ esp_err_t t_a_h_sensor_init(uint32_t poll_interval_ms, uint32_t timeout_ms)
         sensor_ctx = NULL;
         return ESP_FAIL;
     }
+    
+    /* Configure gas heater settings */
+    heatr_conf.enable = BME68X_ENABLE;
+    heatr_conf.heatr_temp = 300; // 300 degrees Celsius
+    heatr_conf.heatr_dur = 100;  // 100 milliseconds
+    
+    rslt = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &sensor_ctx->device);
+    if (rslt != BME68X_OK)
+    {
+        ESP_LOGW(TAG, "Failed to configure heater settings: %d", rslt);
+        // Continue anyway, gas measurements are optional
+    }
 
-    /* Set sensor to normal power mode */
-    rslt = sensor_api_set_power_mode(&sensor_ctx->device, BME280_POWERMODE_NORMAL);
-    if (rslt != BME280_OK)
+    /* Set sensor to sleep mode initially */
+    rslt = bme68x_set_op_mode(BME68X_SLEEP_MODE, &sensor_ctx->device);
+    if (rslt != BME68X_OK)
     {
         ESP_LOGE(TAG, "Failed to set sensor mode");
         vSemaphoreDelete(sensor_ctx->mutex);
@@ -220,7 +234,7 @@ esp_err_t t_a_h_start_polling(void)
     /* Create polling task */
     BaseType_t ret = xTaskCreate(
         polling_task_func,
-        "bme280_poll",
+        "bme68x_poll",
         STACK_SIZE,
         sensor_ctx,
         TASK_PRIORITY,
@@ -379,7 +393,11 @@ esp_err_t t_a_h_deinit(void)
     if (sensor_ctx != NULL)
     {
         /* Set sensor to sleep mode */
-        sensor_api_set_power_mode(&sensor_ctx->device, BME280_POWERMODE_SLEEP);
+        bme68x_set_op_mode(BME68X_SLEEP_MODE, &sensor_ctx->device);
+        
+        /* Deinitialize the BME68X interface hardware */
+        bme68x_deinit(sensor_ctx->device.intf);
+        ESP_LOGI(TAG, "BME68X interface deinitialized");
         
         /* Delete mutex if it exists */
         if (sensor_ctx->mutex != NULL)
@@ -404,20 +422,52 @@ esp_err_t t_a_h_deinit(void)
 static void polling_task_func(void *arg)
 {
     t_a_h_context_t *ctx = (t_a_h_context_t *)arg;
-    struct bme280_data comp_data;
+    struct bme68x_data data;
     t_a_h_data_t sensor_data;
     int8_t rslt;
+    uint8_t n_fields;
     TickType_t last_wake_time = xTaskGetTickCount();
-    
     
     ESP_LOGI(TAG, "Polling task started");
 
-
     while (ctx->task_running) {
         
-        /* Attempt to read data from the sensor */
-        rslt = sensor_api_read_data(&ctx->device, &comp_data);
-        if (rslt != BME280_OK) {
+        /* Set to forced mode to trigger one measurement */
+        rslt = bme68x_set_op_mode(BME68X_FORCED_MODE, &ctx->device);
+        if (rslt != BME68X_OK) {
+            ctx->error_count++;
+            ESP_LOGW(TAG, "Failed to set forced mode, error count: %d", ctx->error_count);
+            
+            if (ctx->error_count >= 5) {
+                ctx->retry_count++;
+                ctx->error_count = 0;
+                
+                if (ctx->retry_count >= 3) {
+                    ESP_LOGE(TAG, "Recovery attempts exhausted, sensor failure");
+                    ctx->state = SENSOR_STATE_ERROR;
+                    break;
+                }
+            }
+            
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
+        
+        /* Calculate delay period for the measurement to complete */
+        struct bme68x_conf conf;
+        rslt = bme68x_get_conf(&conf, &ctx->device);
+        if (rslt != BME68X_OK) {
+            ESP_LOGW(TAG, "Failed to get configuration, using default delay");
+            /* Use default delay if we can't get the configuration */
+            vTaskDelay(pdMS_TO_TICKS(200));
+        } else {
+            uint32_t del_period = bme68x_get_meas_dur(BME68X_FORCED_MODE, &conf, &ctx->device) + (100 * 1000); // Adding 100ms for heating time
+            ctx->device.delay_us(del_period, ctx->device.intf_ptr);
+        }
+        
+        /* Get data */
+        rslt = bme68x_get_data(BME68X_FORCED_MODE, &data, &n_fields, &ctx->device);
+        if (rslt != BME68X_OK || n_fields == 0) {
             ctx->error_count++;
             ESP_LOGW(TAG, "Failed to read sensor data, error count: %d", ctx->error_count);
             
@@ -433,13 +483,6 @@ static void polling_task_func(void *arg)
                     ctx->state = SENSOR_STATE_ERROR;
                     break;
                 }
-                
-                /* Attempt to reinitialize */
-                struct bme280_settings settings;
-                sensor_api_get_settings(&ctx->device, &settings);
-                sensor_api_set_power_mode(&ctx->device, BME280_POWERMODE_NORMAL);
-                sensor_api_configure(&ctx->device, &settings);
-                
             }
             
             /* Wait before trying again */
@@ -452,9 +495,9 @@ static void polling_task_func(void *arg)
         ctx->retry_count = 0;
         
         /* Convert to more usable units if needed */
-        sensor_data.temperature = comp_data.temperature;
-        sensor_data.pressure = comp_data.pressure / 100.0f; // Convert Pa to hPa
-        sensor_data.humidity = comp_data.humidity;
+        sensor_data.temperature = data.temperature;
+        sensor_data.pressure = data.pressure / 100.0f; // Convert Pa to hPa
+        sensor_data.humidity = data.humidity;
         sensor_data.timestamp = get_timestamp_ms();
         
         /* Try to take mutex to update data */
@@ -473,17 +516,16 @@ static void polling_task_func(void *arg)
         static uint32_t log_counter = 0;
         log_counter++;
         if (log_counter % 10 == 0) { // Log every 10th reading
-            ESP_LOGI(TAG, "Sensor data: Temp=%.2f°C, Pressure=%.2fhPa, Humidity=%.2f%%",
-                   sensor_data.temperature, sensor_data.pressure, sensor_data.humidity);
+            ESP_LOGI(TAG, "Sensor data: Temp=%.2f°C, Pressure=%.2fhPa, Humidity=%.2f%%, Gas=%.2f Ohm",
+                   sensor_data.temperature, sensor_data.pressure, sensor_data.humidity, data.gas_resistance);
         }
         
         /* Delay until next measurement, using the calculated interval */
         vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(ctx->poll_interval_ms));
-        
     }
     
     /* Set sensor to sleep mode to save power */
-    sensor_api_set_power_mode(&ctx->device, BME280_POWERMODE_SLEEP);
+    bme68x_set_op_mode(BME68X_SLEEP_MODE, &ctx->device);
     
     /* Task cleanup */
     ESP_LOGI(TAG, "Polling task stopped");
