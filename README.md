@@ -131,7 +131,7 @@ temp-ble-beacon/
 ## Data Format
 
 The BLE advertisement data contains:
-- Company ID: 0xFFFF (Volcatec)
+- Company ID: 0xFFFF 
 - Data type: 0x01 (Temperature)
 - Data type: 0x02 (Humidity)
 - Data type: 0x03 (Pressure)
